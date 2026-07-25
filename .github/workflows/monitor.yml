@@ -1,0 +1,42 @@
+name: Production monitor
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # ~07:00 Lisbon (06:00 UTC)
+  workflow_dispatch:
+    inputs:
+      force_email:
+        description: 'Send the digest email even if all checks pass'
+        type: boolean
+        default: false
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Install Playwright browser
+        run: pwsh bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run monitor
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          FORCE_EMAIL: ${{ inputs.force_email && '1' || '' }}
+        run: dotnet run -c Release --no-build
