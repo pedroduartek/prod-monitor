@@ -12,10 +12,10 @@ Daily synthetic monitoring for the production apps, with email reports. A small
   launcher only appears once the browser reaches the API health endpoint
   (Cloudflare's Bot Fight Mode blocks direct requests from CI/datacenter IPs).
 - **TLS**: every host's certificate is valid for at least 14 more days.
-- **Domain registration**: `pedroduartek.com` is registered for at least 30 more
-  days (authoritative registry RDAP over HTTPS). `.pt` domains are not checked
-  here: `.pt` has no RDAP and its WHOIS blocks datacenter/CI access, so their
-  renewal is tracked manually.
+- **Domain registration**: every domain (pedroduartek.pt, pedroduartek.com,
+  duartek.pt, ourivesariarinchoa.pt) is registered for at least 30 more days.
+  gTLDs use free authoritative registry RDAP over HTTPS; `.pt` (no RDAP, WHOIS
+  blocks datacenter/CI) goes through the WhoisXML API (`WHOISXML_API_KEY`).
 
 Browser checks use [Playwright for .NET](https://playwright.dev/dotnet/); the
 TLS check uses a raw `SslStream`.
@@ -41,4 +41,5 @@ dotnet run -c Release --no-build
 
 ## Required GitHub Actions secrets
 
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `BREVO_SMTP_KEY`, `MAIL_FROM`, `MAIL_TO`.
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `BREVO_SMTP_KEY`, `MAIL_FROM`, `MAIL_TO`,
+`WHOISXML_API_KEY` (WhoisXML API, for `.pt` domain expiry).

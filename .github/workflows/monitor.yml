@@ -38,5 +38,6 @@ jobs:
           SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          WHOISXML_API_KEY: ${{ secrets.WHOISXML_API_KEY }}
           FORCE_EMAIL: ${{ inputs.force_email && '1' || '' }}
         run: dotnet run -c Release --no-build

@@ -29,12 +29,14 @@ public static class Targets
     // Cloudflare's Bot Fight Mode, which challenges direct requests from CI IPs.
     public const string ChatSiteUrl = "https://pedroduartek.com/";
 
-    // Domain registration expiry (RDAP), distinct from the TLS cert check.
-    // Only gTLDs are listed: they expose authoritative RDAP over HTTPS. The .pt
-    // domains (pedroduartek.pt, duartek.pt, ourivesariarinchoa.pt) have no RDAP
-    // and their WHOIS blocks datacenter/CI access, so they are tracked manually.
+    // Domain registration expiry, distinct from the TLS cert check. gTLDs use
+    // free authoritative RDAP; .pt goes through the WhoisXML API (see the check,
+    // since .pt has no RDAP and its WHOIS blocks datacenter/CI access).
     public static readonly string[] Domains =
     [
+        "pedroduartek.pt",
         "pedroduartek.com",
+        "duartek.pt",
+        "ourivesariarinchoa.pt",
     ];
 }
