@@ -77,15 +77,34 @@ public static class DomainExpiryCheck
     // .pt: DNS.PT WHOIS over TCP 43. Line format: "Expiration Date: DD/MM/YYYY HH:MM:SS".
     private static async Task<DateTime?> PtWhoisExpiryAsync(string domain)
     {
+        // The DNS.PT WHOIS server returns the record but may keep the connection
+        // open (no EOF), so read with a hard timeout and stop as soon as the
+        // expiry line arrives instead of waiting for the stream to close.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
         using var client = new TcpClient();
-        await client.ConnectAsync("whois.dns.pt", 43).WaitAsync(TimeSpan.FromSeconds(15));
+        await client.ConnectAsync("whois.dns.pt", 43, cts.Token);
 
         var stream = client.GetStream();
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(domain + "\r\n"));
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        var text = await reader.ReadToEndAsync();
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(domain + "\r\n"), cts.Token);
 
-        var m = Regex.Match(text, @"Expiration Date:\s*(\d{2})/(\d{2})/(\d{4})");
+        var sb = new StringBuilder();
+        var buffer = new byte[4096];
+        try
+        {
+            int read;
+            while ((read = await stream.ReadAsync(buffer, cts.Token)) > 0)
+            {
+                sb.Append(Encoding.UTF8.GetString(buffer, 0, read));
+                if (sb.ToString().Contains("Expiration Date", StringComparison.Ordinal))
+                    break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Timed out waiting for more data; parse whatever arrived.
+        }
+
+        var m = Regex.Match(sb.ToString(), @"Expiration Date:\s*(\d{2})/(\d{2})/(\d{4})");
         if (!m.Success) return null;
 
         return new DateTime(
