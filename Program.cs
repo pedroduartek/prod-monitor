@@ -14,6 +14,9 @@ results.AddRange(await BrowserChecks.RunAsync());
 // TLS certificate expiry.
 results.AddRange(await TlsCheck.RunAsync(Targets.TlsHosts));
 
+// Domain registration expiry (WHOIS/RDAP).
+results.AddRange(await DomainExpiryCheck.RunAsync(Targets.Domains));
+
 foreach (var r in results)
 {
     var status = r.Ok ? "PASS" : "FAIL";

@@ -28,4 +28,13 @@ public static class Targets
     // only mounts once the browser reaches the API health endpoint. This sidesteps
     // Cloudflare's Bot Fight Mode, which challenges direct requests from CI IPs.
     public const string ChatSiteUrl = "https://pedroduartek.com/";
+
+    // Domain registration expiry (WHOIS/RDAP), distinct from the TLS cert check.
+    public static readonly string[] Domains =
+    [
+        "pedroduartek.pt",
+        "pedroduartek.com",
+        "duartek.pt",
+        "ourivesariarinchoa.pt",
+    ];
 }
