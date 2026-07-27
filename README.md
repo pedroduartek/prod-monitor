@@ -12,9 +12,10 @@ Daily synthetic monitoring for the production apps, with email reports. A small
   launcher only appears once the browser reaches the API health endpoint
   (Cloudflare's Bot Fight Mode blocks direct requests from CI/datacenter IPs).
 - **TLS**: every host's certificate is valid for at least 14 more days.
-- **Domain registration**: every domain (pedroduartek.pt, pedroduartek.com,
-  duartek.pt, ourivesariarinchoa.pt) is registered for at least 30 more days
-  (RDAP for gTLDs, DNS.PT WHOIS over TCP 43 for `.pt`).
+- **Domain registration**: `pedroduartek.com` is registered for at least 30 more
+  days (authoritative registry RDAP over HTTPS). `.pt` domains are not checked
+  here: `.pt` has no RDAP and its WHOIS blocks datacenter/CI access, so their
+  renewal is tracked manually.
 
 Browser checks use [Playwright for .NET](https://playwright.dev/dotnet/); the
 TLS check uses a raw `SslStream`.

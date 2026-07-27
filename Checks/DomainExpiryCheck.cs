@@ -1,15 +1,13 @@
 using System.Globalization;
-using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace ProdMonitor.Checks;
 
 /// <summary>
-/// Domain registration expiry, so a forgotten renewal is caught weeks early.
-/// .com and other gTLDs are read over RDAP (JSON/HTTPS); .pt has no public RDAP,
-/// so it is read from the DNS.PT WHOIS server over TCP 43.
+/// Domain registration expiry via authoritative registry RDAP (JSON over HTTPS),
+/// so a forgotten renewal is caught weeks early. Only gTLDs are covered: .pt has
+/// no RDAP at all and its WHOIS (whois.dns.pt) times out for datacenter/CI IPs
+/// and even third-party proxies, so .pt renewals are tracked manually.
 /// </summary>
 public static class DomainExpiryCheck
 {
@@ -24,10 +22,7 @@ public static class DomainExpiryCheck
             var name = $"Domain {domain} registration is valid for {WarnDays}+ days";
             try
             {
-                var expiry = domain.EndsWith(".pt", StringComparison.OrdinalIgnoreCase)
-                    ? await PtWhoisExpiryAsync(domain)
-                    : await RdapExpiryAsync(domain);
-
+                var expiry = await RdapExpiryAsync(domain);
                 if (expiry is null)
                 {
                     results.Add(new(name, false, "could not determine expiry date"));
@@ -48,10 +43,19 @@ public static class DomainExpiryCheck
         return results;
     }
 
-    // gTLDs (.com, ...): RDAP JSON over HTTPS. rdap.org bootstraps to the registry.
     private static async Task<DateTime?> RdapExpiryAsync(string domain)
     {
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"https://rdap.org/domain/{domain}");
+        // Query the authoritative registry RDAP directly. The rdap.org proxy
+        // returns 403 to CI/datacenter IPs, so it is only a last-resort fallback.
+        var tld = domain[(domain.LastIndexOf('.') + 1)..].ToLowerInvariant();
+        var baseUrl = tld switch
+        {
+            "com" or "net" => $"https://rdap.verisign.com/{tld}/v1/domain/",
+            "org" => "https://rdap.publicinterestregistry.org/rdap/domain/",
+            _ => "https://rdap.org/domain/",
+        };
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, baseUrl + domain);
         req.Headers.Add("Accept", "application/rdap+json");
         using var resp = await Http.SendAsync(req);
         resp.EnsureSuccessStatusCode();
@@ -72,45 +76,5 @@ public static class DomainExpiryCheck
             }
         }
         return null;
-    }
-
-    // .pt: DNS.PT WHOIS over TCP 43. Line format: "Expiration Date: DD/MM/YYYY HH:MM:SS".
-    private static async Task<DateTime?> PtWhoisExpiryAsync(string domain)
-    {
-        // The DNS.PT WHOIS server returns the record but may keep the connection
-        // open (no EOF), so read with a hard timeout and stop as soon as the
-        // expiry line arrives instead of waiting for the stream to close.
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
-        using var client = new TcpClient();
-        await client.ConnectAsync("whois.dns.pt", 43, cts.Token);
-
-        var stream = client.GetStream();
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(domain + "\r\n"), cts.Token);
-
-        var sb = new StringBuilder();
-        var buffer = new byte[4096];
-        try
-        {
-            int read;
-            while ((read = await stream.ReadAsync(buffer, cts.Token)) > 0)
-            {
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, read));
-                if (sb.ToString().Contains("Expiration Date", StringComparison.Ordinal))
-                    break;
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Timed out waiting for more data; parse whatever arrived.
-        }
-
-        var m = Regex.Match(sb.ToString(), @"Expiration Date:\s*(\d{2})/(\d{2})/(\d{4})");
-        if (!m.Success) return null;
-
-        return new DateTime(
-            int.Parse(m.Groups[3].Value), // year
-            int.Parse(m.Groups[2].Value), // month
-            int.Parse(m.Groups[1].Value), // day
-            0, 0, 0, DateTimeKind.Utc);
     }
 }
