@@ -17,7 +17,17 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
+      # GitHub disables a scheduled workflow after 60 days without repo activity.
+      # Re-enabling it on every run resets that timer.
+      - name: Keep the schedule alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/monitor.yml/enable
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
